@@ -6,9 +6,10 @@ on:
       tagName:
         description: 'Select AAPS Version'
         required: true
-        default: '3.4.2.2'
+        default: '4.0.0'
         type: choice
         options:
+          - 4.0.0
           # ── 3.4.x (JDK 21) ──────────────────────────────
           - 3.4.2.2
           - 3.4.2.1
@@ -59,12 +60,19 @@ jobs:
   build:
     name: Build AAPS
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEYSTORE_SET: ${{ secrets.KEYSTORE_SET }}
+      SECRET_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      SECRET_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      SECRET_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      SECRET_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      SECRET_GDRIVE_OAUTH2: ${{ secrets.GDRIVE_OAUTH2 }}
     steps:
       - name: Decode Secrets Keystore Set and Oauth2 to Env
         run: |
-          if [ -n "${{ secrets.KEYSTORE_SET }}" ]; then
+          if [ -n "${SECRET_KEYSTORE_SET}" ]; then
             echo "🔐 Decoding KEYSTORE_SET..."
-            DECODED=$(echo "${{ secrets.KEYSTORE_SET }}" | base64 -d)
+            DECODED=$(echo "${SECRET_KEYSTORE_SET}" | base64 -d)
 
             KEYSTORE_BASE64=$(echo "$DECODED" | cut -d'|' -f1)
             KEYSTORE_PASSWORD=$(echo "$DECODED" | cut -d'|' -f2)
@@ -84,12 +92,12 @@ jobs:
             echo "✅ Keystore parameters extracted from KEYSTORE_SET"
           else
             echo "ℹ️ KEYSTORE_SET not provided, using separate secrets."
-            echo "KEYSTORE_BASE64=${{ secrets.KEYSTORE_BASE64 }}" >> $GITHUB_ENV
-            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEYSTORE_BASE64=${SECRET_KEYSTORE_BASE64}" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=${SECRET_KEYSTORE_PASSWORD}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${SECRET_KEY_ALIAS}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${SECRET_KEY_PASSWORD}" >> $GITHUB_ENV
           fi
-          echo "GDRIVE_OAUTH2=${{ secrets.GDRIVE_OAUTH2 }}" >> $GITHUB_ENV
+          echo "GDRIVE_OAUTH2=${SECRET_GDRIVE_OAUTH2}" >> $GITHUB_ENV
 
       - name: Check Secrets
         run: |
@@ -125,7 +133,6 @@ jobs:
 
       - name: Validating keystore, alias and password
         run: |
-          set -x
           echo "🔐 Validating keystore, alias and password"
 
           # Create a dummy JAR file (quick method using zip)
@@ -149,13 +156,12 @@ jobs:
           rm -f "$JARSIGNER_LOG" dummy.jar
           echo "✅ Keystore, alias, and key password are valid."
 
-          rm -f "$KEYTOOL_LOG"
           echo "✅ Keystore and credentials validated."
 
       - name: Decode GDrive OAuth2 secrets
         run: |
           echo "🔐 Decoding GDRIVE_OAUTH2..."
-          DECODED=$(echo "${{ secrets.GDRIVE_OAUTH2 }}" | base64 -d)
+          DECODED=$(echo "${SECRET_GDRIVE_OAUTH2}" | base64 -d)
 
           GDRIVE_CLIENT_ID=$(echo "$DECODED" | cut -d'|' -f1)
           GDRIVE_REFRESH_TOKEN=$(echo "$DECODED" | cut -d'|' -f2)
